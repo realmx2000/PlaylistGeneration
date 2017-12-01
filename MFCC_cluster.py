@@ -30,7 +30,7 @@ def cluster_song(tm, threshhold = 10, min_clusters = 4, max_it = 100):
 
 		kmeans = KMeans(n_clusters=k, init=centroids, max_iter=1).fit(tm)
 
-		if (it > 3):
+		if (it > 0):
 			new_centroids = remove_one_clusters(kmeans)
 
 		new_centroids = collapse_centroids(kmeans)
@@ -134,7 +134,6 @@ def collapse_centroids(kmeans):
 def maximize_priors(cloud, means, covariances):
 	priors = np.zeros((1, means.shape[1]))
 	priors.fill(1/means.shape[1])
-	old_priors = priors
 	delta = 10
 	while(delta > 0.1):
 		posteriors = calculate_posteriors(cloud, means, covariances, priors)
@@ -192,6 +191,8 @@ def likelihood(priors1, priors2, means1, means2, covariances):
 
 			if (np.linalg.matrix_rank(covariances[j,:,:]) < covariances[j,:,:].shape[0]):
 				likelihood_b = 0
+				likelihood_b = multivariate_normal.pdf(means1[:, i], mean=means2[:, j], cov=covariances[j, :, :])
+				print("Singular")
 			else:
 				likelihood_b = multivariate_normal.pdf(means1[:,i], mean=means2[:,j], cov=covariances[j,:,:])
 

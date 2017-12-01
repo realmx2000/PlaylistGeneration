@@ -27,7 +27,20 @@ def MFCC_dists(mfccs):
             covs1[l] = diag_cov(cloud[i][:,labels[i] == l])
         covs1 = np.array(covs1)
 
+        counts1 = {}
+        for w in labels[i]:
+            if w not in counts1:
+                counts1[w] = 0
+            counts1[w] += 1
+
         for j in range(i+1, num_songs):
+
+            counts2 = {}
+            for w in labels[j]:
+                if w not in counts2:
+                    counts2[w] = 0
+                counts2[w] += 1
+
             num_clusters_j = centers[j].shape[1]
             covs2 = [None] * num_clusters_j
             for m in range(num_clusters_j):
