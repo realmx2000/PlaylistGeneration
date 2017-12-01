@@ -24,7 +24,6 @@ def MFCC_dists(mfccs):
         num_clusters_i = centers[i].shape[1]
         covs1 = [None] * num_clusters_i
         for l in range(num_clusters_i):
-            covs1[l] = np.cov(cloud[i][:,labels[i] == l])
             covs1[l] = diag_cov(cloud[i][:,labels[i] == l])
         covs1 = np.array(covs1)
 
