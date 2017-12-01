@@ -74,7 +74,7 @@ def generate_cloud(timbre_matrix, window_length):
 
 def collapse_centroids(kmeans):
 	# TUNE THIS
-	threshold = 10
+	threshold = 200
 
 	centroids = kmeans.cluster_centers_
 	labels = kmeans.labels_
@@ -97,7 +97,7 @@ def collapse_centroids(kmeans):
 	for i in range(shape):
 		min_dist = min(distances[i]);
 		min_index = np.nonzero(distances[i] == min_dist)[0][0]
-		if ((min_dist < threshold or counts[i] < 73) and i not in already_combined):
+		if ((min_dist < threshold) and i not in already_combined):
 			new_centroid =(counts[i]*centroids[i] + counts[min_index]*centroids[min_index])/(counts[i]+counts[min_index])
 			new_centroids.append(new_centroid)
 			already_combined.add(min_index)
