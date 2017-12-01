@@ -41,7 +41,7 @@ def MFCC_dists(mfccs):
             dist_matrix[j,i] = dist_matrix[i,j]
     return(dist_matrix)
 
-def diag_cov(data)
+def diag_cov(data):
     variances = np.var(data, axis=1)
     return np.diag(variances)
 
@@ -133,7 +133,7 @@ for weights in weight:
     print("Data loaded")
 
     num_songs = data.shape[0]
-    num_songs_to_cluster = 400
+    num_songs_to_cluster = 6
     tms = [None] * num_songs_to_cluster
     converted = [None] * num_songs_to_cluster
     for i in range(0, num_songs_to_cluster):

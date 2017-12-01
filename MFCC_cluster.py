@@ -33,15 +33,10 @@ def cluster_song(tm, threshhold = 10, min_clusters = 4, max_it = 100):
 		for i in range(kmeans.labels_.shape[0]):
 			centroid_assignment = centroids[kmeans.labels_[i]]
 			error = tm[i,:] - centroid_assignment
-			#print(error.shape)
 			new_distortion += np.dot(error.T, error)
-		#print(distortion)
-		if(new_centroids.shape == centroids.shape):
-			print (new_distortion - distortion)
 
 
 		if (new_centroids.shape == centroids.shape and np.linalg.norm(new_distortion - distortion) < threshold):
-			#print("TRUE")
 			centroids = new_centroids
 			converged = True
 			break
@@ -50,7 +45,6 @@ def cluster_song(tm, threshhold = 10, min_clusters = 4, max_it = 100):
 			centroids = new_centroids
 		distortion = new_distortion
 	if it == max_it:
-		print("Did this")
 		kmeans = KMeans(n_clusters=k).fit(tm)
 		converged = True
 
@@ -115,12 +109,14 @@ def collapse_centroids(kmeans):
 def maximize_priors(cloud, means, covariances):
 	priors = np.zeros((1, means.shape[1]))
 	priors.fill(1/means.shape[1])
-	old_priors = np.zeros((1, means.shape[0]))
-	while(np.linalg.norm(priors-old_priors) > 0.1):
+	old_priors = priors
+	delta = 10
+	while(delta > 0.1):
 		posteriors = calculate_posteriors(cloud, means, covariances, priors)
 		old_priors = priors
 		priors = np.sum(posteriors, axis=0, keepdims=True)
 		priors /= cloud.shape[0]
+		delta = np.linalg.norm(priors-old_priors)
 	return priors
 
 #E-step: Calculate soft guesses for latent variables.
@@ -133,6 +129,8 @@ def calculate_posteriors(data, means, covariances, priors):
 			mean = means[:,j]
 			covariance = covariances[j,:,:]
 			prior = priors[0,j]
+			print(prior)
+			# print(covariance)
 			likelihood = multivariate_normal.pdf(x, mean, covariance)
 			posterior = likelihood * prior
 			marginal += posterior
