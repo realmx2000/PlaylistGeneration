@@ -41,7 +41,7 @@ def MFCC_dists(mfccs):
             dist_matrix[j,i] = dist_matrix[i,j]
     return(dist_matrix)
 
-def diag_cov(data)
+def diag_cov(data):
     variances = np.var(data, axis=1)
     return np.diag(variances)
 
