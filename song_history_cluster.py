@@ -25,13 +25,14 @@ def MFCC_dists(mfccs):
         covs1 = [None] * num_clusters_i
         for l in range(num_clusters_i):
             covs1[l] = np.cov(cloud[i][:,labels[i] == l])
+            covs1[l] = diag_cov(cloud[i][:,labels[i] == l])
         covs1 = np.array(covs1)
 
         for j in range(i+1, num_songs):
             num_clusters_j = centers[j].shape[1]
             covs2 = [None] * num_clusters_j
             for m in range(num_clusters_j):
-                covs2[m] = np.cov(cloud[j][:,labels[j] == m])
+                covs2[m] = diag_cov(cloud[j][:,labels[j] == m])
             covs2 = np.array(covs2)
 
             priors1 = tm_cl.maximize_priors(cloud[i].T, centers[i], covs1)
@@ -40,6 +41,10 @@ def MFCC_dists(mfccs):
             dist_matrix[i,j] = tm_cl.calculate_distance(priors1, priors2, centers[i], centers[j], covs1, covs2)
             dist_matrix[j,i] = dist_matrix[i,j]
     return(dist_matrix)
+
+def diag_cov(data)
+    variances = np.var(data, axis=1)
+    return np.diag(variances)
 
 def tag_differences(tag_lists):
     num_songs = len(tag_lists)
