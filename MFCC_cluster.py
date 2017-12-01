@@ -8,7 +8,7 @@ def reconstruct(tm_flat):
 def cluster_song(tm, threshhold = 10, min_clusters = 4, max_it = 100):
 	# TUNE THESE
 	#.0001 increases the spread of numbers of clusters, but not the mean number.
-	threshold = 10000
+	threshold = 1000
 	#Lots of songs naturally go to 1 cluster essentailly regardless of threshhold without this.
 	min_clusters = 1
 
@@ -27,14 +27,18 @@ def cluster_song(tm, threshhold = 10, min_clusters = 4, max_it = 100):
 			centroids = kmeans.cluster_centers_
 			continue; 
 
+
 		kmeans = KMeans(n_clusters=k, init=centroids, max_iter=1).fit(tm)
+
+		if (it > 3):
+			new_centroids = remove_one_clusters(kmeans)
+
 		new_centroids = collapse_centroids(kmeans)
 		new_distortion = 0
 		for i in range(kmeans.labels_.shape[0]):
 			centroid_assignment = centroids[kmeans.labels_[i]]
 			error = tm[i,:] - centroid_assignment
 			new_distortion += np.dot(error.T, error)
-
 
 		if (new_centroids.shape == centroids.shape and np.linalg.norm(new_distortion - distortion) < threshold):
 			centroids = new_centroids
@@ -52,7 +56,7 @@ def cluster_song(tm, threshhold = 10, min_clusters = 4, max_it = 100):
 	if not converged:
 		kmeans = KMeans(n_clusters=k, init=centroids).fit(tm)
 		centroids = kmeans.cluster_centers_
-
+	#print(it)
 	return centroids, kmeans.labels_
 
 def generate_cloud(timbre_matrix, window_length):
@@ -64,6 +68,26 @@ def generate_cloud(timbre_matrix, window_length):
 		vectors[index,:] = np.concatenate((vector,deltas))
 		prev_vector = vector
 	return(vectors)
+
+
+def remove_one_clusters(kmeans):
+	centroids = kmeans.cluster_centers_
+	labels = kmeans.labels_
+	counts = {}
+	new_centroids = []
+	shape = centroids.shape[0]
+
+	for i in labels:
+		if i not in counts:
+			counts[i] = 0
+		counts[i] += 1
+
+	for i in range(shape):
+		if counts[i] > 1:
+			new_centroids.append(centroids[i])
+
+	return(new_centroids)
+
 
 
 def collapse_centroids(kmeans):
@@ -85,6 +109,7 @@ def collapse_centroids(kmeans):
 		for j in range(i+1,shape):
 			distances[i][j] = np.linalg.norm(centroids[j]-centroids[i])
 			distances[j][i] = distances[i][j]
+
 
 	new_centroids = []
 	already_combined = set()
@@ -129,9 +154,10 @@ def calculate_posteriors(data, means, covariances, priors):
 			mean = means[:,j]
 			covariance = covariances[j,:,:]
 			prior = priors[0,j]
-			print(prior)
-			# print(covariance)
-			likelihood = multivariate_normal.pdf(x, mean, covariance)
+			if (np.linalg.matrix_rank(covariance) < covariance.shape[0]):
+				likelihood = 0
+			else:
+				likelihood = multivariate_normal.pdf(x, mean, covariance)
 			posterior = likelihood * prior
 			marginal += posterior
 			posteriors[i,j] = posterior
@@ -163,7 +189,12 @@ def likelihood(priors1, priors2, means1, means2, covariances):
 		likelihood_a = 0
 		for j in range(priors2.shape[1]):
 			weight_b = priors2[0,j]
-			likelihood_b = multivariate_normal.pdf(means1[:,i], mean=means2[:,j], cov=covariances[j,:,:])
+
+			if (np.linalg.matrix_rank(covariances[j,:,:]) < covariances[j,:,:].shape[0]):
+				likelihood_b = 0
+			else:
+				likelihood_b = multivariate_normal.pdf(means1[:,i], mean=means2[:,j], cov=covariances[j,:,:])
+
 			likelihood_a += weight_b * likelihood_b
 		likelihood_a = np.log(likelihood_a)
 		likelihood += weight_a * likelihood_a
