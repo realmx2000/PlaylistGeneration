@@ -56,8 +56,47 @@ def cluster_song(tm, threshhold = 10, min_clusters = 4, max_it = 100):
 	if not converged:
 		kmeans = KMeans(n_clusters=k, init=centroids).fit(tm)
 		centroids = kmeans.cluster_centers_
-	#print(it)
-	return centroids, kmeans.labels_
+	usable = []
+	not_usable = []
+	labels = list(kmeans.labels_)
+	counts = {}
+	new_centroids = []
+	for i in labels:
+		if i not in counts:
+			counts[i] = 0
+		counts[i] += 1
+	for count in counts:
+		if counts[count] != 1:
+			usable.append(count)
+			new_centroids.append(centroids[count])
+		else:
+			not_usable.append(count)
+	for i in range(len(labels)):
+		if labels[i] not in usable:
+			labels[i] = assign(labels[i], usable, centroids)
+	for i in range(len(labels)):
+		new_list = list(not_usable)
+		new_list.append(int(labels[i]))
+		new_list.sort()
+		ind = new_list.index(labels[i])
+		labels[i] -= ind
+
+	counts = {}
+	for i in labels:
+		if i not in counts:
+			counts[i] = 0
+		counts[i] += 1
+
+	return np.array(new_centroids), np.array(labels)
+
+def assign(original_index, usable, centroids):
+	position = centroids[original_index]
+	index = -1
+	min_distance = float('inf')
+	for i in usable:
+		if np.linalg.norm(centroids[i]-position) < min_distance:
+			index = i
+	return index
 
 def generate_cloud(timbre_matrix, window_length):
 	length = timbre_matrix.shape[1]
@@ -153,10 +192,7 @@ def calculate_posteriors(data, means, covariances, priors):
 			mean = means[:,j]
 			covariance = covariances[j,:,:]
 			prior = priors[0,j]
-			if (np.linalg.matrix_rank(covariance) < covariance.shape[0]):
-				likelihood = 0
-			else:
-				likelihood = multivariate_normal.pdf(x, mean, covariance)
+			likelihood = multivariate_normal.pdf(x, mean, covariance)
 			posterior = likelihood * prior
 			marginal += posterior
 			posteriors[i,j] = posterior
@@ -188,14 +224,7 @@ def likelihood(priors1, priors2, means1, means2, covariances):
 		likelihood_a = 0
 		for j in range(priors2.shape[1]):
 			weight_b = priors2[0,j]
-
-			if (np.linalg.matrix_rank(covariances[j,:,:]) < covariances[j,:,:].shape[0]):
-				likelihood_b = 0
-				likelihood_b = multivariate_normal.pdf(means1[:, i], mean=means2[:, j], cov=covariances[j, :, :])
-				print("Singular")
-			else:
-				likelihood_b = multivariate_normal.pdf(means1[:,i], mean=means2[:,j], cov=covariances[j,:,:])
-
+			likelihood_b = multivariate_normal.pdf(means1[:,i], mean=means2[:,j], cov=covariances[j,:,:])
 			likelihood_a += weight_b * likelihood_b
 		likelihood_a = np.log(likelihood_a)
 		likelihood += weight_a * likelihood_a

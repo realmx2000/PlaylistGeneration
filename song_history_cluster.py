@@ -162,6 +162,7 @@ for weights in weight:
     mfcc_diffs = weights[7]*MFCC_dists(tms)
     print("MFCC matrix calculated")
     print(converted[:,0:6])
+    print(mfcc_diffs)
     converted = np.dot(converted[:,0:6],np.diag(weights[0:6]))
     cs, mus, cluster_mfcc_dists, cluster_tag_dists = k_means(converted[0:num_songs_to_cluster], 2, 20, mfcc_diffs, tag_diffs)
 
