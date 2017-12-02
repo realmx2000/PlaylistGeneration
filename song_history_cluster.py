@@ -15,7 +15,7 @@ def MFCC_dists(mfccs):
     cloud = [None] * num_songs
     for i in range(num_songs):
         cloud[i] = tm_cl.generate_cloud(mfccs[i].astype(float), 5)
-        centers[i], labels[i] = tm_cl.cluster_song(cloud[i])
+        centers[i], labels[i], cloud[i] = tm_cl.cluster_song(cloud[i])
         print("Final num clusters: ", len(centers[i]))
         cloud[i] = cloud[i].T
         centers[i] = centers[i].T

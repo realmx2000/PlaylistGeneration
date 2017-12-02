@@ -27,12 +27,9 @@ def cluster_song(tm, threshhold = 10, min_clusters = 4, max_it = 100):
 			centroids = kmeans.cluster_centers_
 			continue; 
 
-
 		kmeans = KMeans(n_clusters=k, init=centroids, max_iter=1).fit(tm)
-
-		if (it > 0):
-			new_centroids = remove_one_clusters(kmeans)
-
+		#if (it > 0):
+		#	new_centroids = remove_one_clusters(kmeans)
 		new_centroids = collapse_centroids(kmeans)
 		new_distortion = 0
 		for i in range(kmeans.labels_.shape[0]):
@@ -51,12 +48,40 @@ def cluster_song(tm, threshhold = 10, min_clusters = 4, max_it = 100):
 	if it == max_it:
 		kmeans = KMeans(n_clusters=k).fit(tm)
 		converged = True
-
-
 	if not converged:
 		kmeans = KMeans(n_clusters=k, init=centroids).fit(tm)
 		centroids = kmeans.cluster_centers_
-	usable = []
+
+	not_usable = set()
+	usable = set()
+	keep = []
+	labels = list(kmeans.labels_)
+	counts = {}
+	new_centroids = []
+	for i in labels:
+		if i not in counts:
+			counts[i] = 0
+		counts[i] += 1
+	for count in counts:
+		if counts[count] < 2:
+			not_usable.add(count)
+		else:
+			usable.add(count)
+			new_centroids.append(centroids[count])
+
+	for i in range(len(labels)):
+		if labels[i] in usable:
+			keep.append(i)
+			new_list = list(not_usable)
+			new_list.append(int(labels[i]))
+			new_list.sort()
+			ind = new_list.index(labels[i])
+			labels[i] -= ind
+	keep = np.array(keep)
+
+	return np.array(new_centroids), np.array(labels)[keep], tm[keep,:]
+
+	'''usable = []
 	not_usable = []
 	labels = list(kmeans.labels_)
 	counts = {}
@@ -87,7 +112,7 @@ def cluster_song(tm, threshhold = 10, min_clusters = 4, max_it = 100):
 			counts[i] = 0
 		counts[i] += 1
 
-	return np.array(new_centroids), np.array(labels)
+	return np.array(new_centroids), np.array(labels)'''
 
 def assign(original_index, usable, centroids):
 	position = centroids[original_index]
