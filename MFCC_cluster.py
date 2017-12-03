@@ -1,6 +1,9 @@
 import numpy as np
 from sklearn.cluster import KMeans
 from scipy.stats import multivariate_normal
+import scipy.special as sp
+import sys
+import math
 
 def reconstruct(tm_flat):
 	return(np.reshape(tm_flat, (-1, int(tm_flat.shape[0]/12))))
@@ -175,6 +178,7 @@ def maximize_priors(cloud, means, covariances):
 
 #E-step: Calculate soft guesses for latent variables.
 def calculate_posteriors(data, means, covariances, priors):
+	defaulted = 0
 	posteriors = np.zeros((data.shape[0],means.shape[1]))
 	for i in range(data.shape[0]):
 		marginal = 0
@@ -189,9 +193,11 @@ def calculate_posteriors(data, means, covariances, priors):
 			posteriors[i,j] = posterior
 		if marginal == 0:
 			posteriors[i,:].fill(1 / means.shape[1])
+			defaulted += 1
 		else:
 			posteriors[i,:] /= marginal
-
+	proportion = defaulted / data.shape[0]
+	#print(proportion)
 	return posteriors
 
 #Means and covariances can be calculated with np.mean and np.cov, respectively.
@@ -209,17 +215,18 @@ def calculate_distance(priors1, priors2, means1, means2, covariances1, covarianc
 	distance = cross_similarity - self_similarity
 	return distance
 
-#Calculates the likelihood of a set of centroids (means1, priors1) occuring given 
+#Calculates the likelihood of a set of centroids (means1, priors1) occuring given
 #the GMM defined by means2, covariances, priors2.
 def likelihood(priors1, priors2, means1, means2, covariances):
 	likelihood = 0
 	for i in range(priors1.shape[1]):
 		weight_a = priors1[0,i]
-		likelihood_a = 0
+		likelihoods_b = np.zeros((1, priors2.shape[1]))
 		for j in range(priors2.shape[1]):
 			weight_b = priors2[0,j]
-			likelihood_b = multivariate_normal.pdf(means1[:,i], mean=means2[:,j], cov=covariances[j,:,:])
-			likelihood_a += weight_b * likelihood_b
-		likelihood_a = np.log(likelihood_a)
+			log_prob = multivariate_normal.logpdf(means1[:,i], mean=means2[:,j], cov=covariances[j,:,:])
+			likelihoods_b[0,j] = np.log(weight_b) + log_prob
+
+		likelihood_a = sp.logsumexp(a=likelihoods_b)
 		likelihood += weight_a * likelihood_a
 	return likelihood

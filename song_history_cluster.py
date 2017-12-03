@@ -114,8 +114,9 @@ def k_means(data, c_count, max_iter, dist_matrix, tag_matrix):
 # Script
 
 # TUNE THIS
+# Features: Tempo, Familiarity, Hotness, Danceability, Duration, Energy, Loudness, Terms, MFCC
 #weight = [np.array([1,1,1,1,1,1,1,1]),np.array([1,1,1,1/200,1,1/10,1,1]),np.array([0,0,0,0,0,0,0,1]),np.array([1,1,1,1/200,1,1/10,0,1]),np.array([1,1,1,1/200,1,1/10,1,.01]),np.array([0,0,0,1/200,1,1/10,1,1]),np.array([0,0,0,1/200,1,1/10,1,1/100]),np.array([1/10,1/10,1/10,1/200,1,1/10,1,2]),np.array([1,1,1,1,1,1,1,5]),np.array([1,0,1,.01,.4,.3,.3,.1])]
-
+#more weights = np.array([1, 0.1, 0.3, 1, 0.2, 1, 0.5, 1, 1.2]), 
 
 """
 [0 0 0 0 0 0]
