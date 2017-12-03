@@ -178,7 +178,6 @@ def maximize_priors(cloud, means, covariances):
 
 #E-step: Calculate soft guesses for latent variables.
 def calculate_posteriors(data, means, covariances, priors):
-	defaulted = 0
 	posteriors = np.zeros((data.shape[0],means.shape[1]))
 	for i in range(data.shape[0]):
 		marginal = 0
@@ -191,13 +190,11 @@ def calculate_posteriors(data, means, covariances, priors):
 			posterior = likelihood * prior
 			marginal += posterior
 			posteriors[i,j] = posterior
+
 		if marginal == 0:
 			posteriors[i,:].fill(1 / means.shape[1])
-			defaulted += 1
 		else:
 			posteriors[i,:] /= marginal
-	proportion = defaulted / data.shape[0]
-	#print(proportion)
 	return posteriors
 
 #Means and covariances can be calculated with np.mean and np.cov, respectively.
