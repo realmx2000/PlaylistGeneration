@@ -113,7 +113,10 @@ def calculate_posteriors(data, means, covariances, priors):
 			posterior = likelihood * prior
 			marginal += posterior
 			posteriors[i,j] = posterior
-		posteriors[i, :] /= marginal
+		if marginal == 0:
+			posteriors[i, :].fill(1 / means.shape[1])
+		else:
+			posteriors[i, :] /= marginal
 
 	return posteriors
 
