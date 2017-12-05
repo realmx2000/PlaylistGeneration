@@ -180,22 +180,16 @@ def maximize_priors(cloud, means, covariances):
 def calculate_posteriors(data, means, covariances, priors):
 	posteriors = np.zeros((data.shape[0],means.shape[1]))
 	for i in range(data.shape[0]):
-		marginal = 0
 		x = data[i,:]
 		for j in range(means.shape[1]):
 			mean = means[:,j]
 			covariance = covariances[j,:,:]
 			prior = priors[0,j]
-			likelihood = multivariate_normal.pdf(x, mean, covariance)
-			posterior = likelihood * prior
-			marginal += posterior
+			log_like = multivariate_normal.logpdf(x, mean, covariance)
+			posterior = np.log(prior) + log_like
 			posteriors[i,j] = posterior
-
-		if marginal == 0:
-			posteriors[i,:].fill(1 / means.shape[1])
-		else:
-			posteriors[i,:] /= marginal
-	return posteriors
+		posteriors[i,:] -= sp.logsumexp(posteriors[i,:])
+	return np.exp(posteriors)
 
 #Means and covariances can be calculated with np.mean and np.cov, respectively.
 
@@ -217,10 +211,10 @@ def calculate_distance(priors1, priors2, means1, means2, covariances1, covarianc
 def likelihood(priors1, priors2, means1, means2, covariances):
 	likelihood = 0
 	for i in range(priors1.shape[1]):
-		weight_a = priors1[0,i]
+		weight_a = priors1[0,i] + 1e-100
 		likelihoods_b = np.zeros((1, priors2.shape[1]))
 		for j in range(priors2.shape[1]):
-			weight_b = priors2[0,j]
+			weight_b = priors2[0,j] + 1e-100
 			log_prob = multivariate_normal.logpdf(means1[:,i], mean=means2[:,j], cov=covariances[j,:,:])
 			likelihoods_b[0,j] = np.log(weight_b) + log_prob
 

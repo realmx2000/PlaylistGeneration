@@ -20,6 +20,7 @@ def MFCC_dists(mfccs):
         centers[i] = centers[i].T
 
     for i in range(num_songs):
+        print("Distance from %d" % i)
         num_clusters_i = centers[i].shape[1]
         covs1 = [None] * num_clusters_i
         for l in range(num_clusters_i):
@@ -33,6 +34,7 @@ def MFCC_dists(mfccs):
             counts1[w] += 1
 
         for j in range(i+1, num_songs):
+            print("To %d" % j)
 
             counts2 = {}
             for w in labels[j]:
@@ -139,7 +141,9 @@ def k_means(data, c_count, max_iter, dist_matrix, tag_matrix):
 ('Face the Ashes', 'Gob') Rock/Metal
 ('The Moon And I (Ordinary Day Album Version)', 'Jeff And Sheri Easter') Country
 """
-weight = [np.array([1,1,1,1,1,1,1,1,1]),np.array([1,1,1,1,1/200,1,1/10,1,.01]),np.array([1,1,1,1,1/200,1,1/10,1,1]),np.array([0,0,0,0,0,0,0,0,1]),np.array([1,1,1,1,1/200,1,1/10,0,1]),np.array([1,0,0,0,1/200,1,1/10,1,1]),np.array([1,0,0,0,1/200,1,1/10,1,1/100]),np.array([1,1/10,1/10,1/10,1/200,1,1/10,1,2]),np.array([1,1,1,1,1,1,1,1,5]),np.array([1,1,0,1,.01,.4,.3,.3,.1])]
+#weight = [np.array([1,1,1,1,1,1,1,1,1]),np.array([1,1,1,1,1/200,1,1/10,1,.01]),np.array([1,1,1,1,1/200,1,1/10,1,1]),np.array([0,0,0,0,0,0,0,0,1]),np.array([1,1,1,1,1/200,1,1/10,0,1]),np.array([1,0,0,0,1/200,1,1/10,1,1]),np.array([1,0,0,0,1/200,1,1/10,1,1/100]),np.array([1,1/10,1/10,1/10,1/200,1,1/10,1,2]),np.array([1,1,1,1,1,1,1,1,5]),np.array([1,1,0,1,.01,.4,.3,.3,.1])]
+#weight = [np.array([1, 0, 0, 0, 0, 0, 1, 1, 0.1])]
+weight = [np.array([0, 0, 0, 0, 0, 0, 0, 0, 1])]
 for weights in weight:
 
     data = np.load('TestCase.npy')
@@ -168,7 +172,5 @@ for weights in weight:
     print(converted[:,0:7])
     print(mfcc_diffs)
     converted = np.dot(converted[:,0:7],np.diag(weights[0:7]))
-    cs, mus, cluster_mfcc_dists, cluster_tag_dists = k_means2(converted[0:num_songs_to_cluster], 3, 20, mfcc_diffs, tag_diffs)
+    cs, mus, cluster_mfcc_dists, cluster_tag_dists = k_means(converted[0:num_songs_to_cluster], 3, 20, mfcc_diffs, tag_diffs)
     print(cs)
-
-
