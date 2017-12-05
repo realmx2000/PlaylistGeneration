@@ -139,32 +139,33 @@ def k_means(data, c_count, max_iter, dist_matrix, tag_matrix):
 ('Face the Ashes', 'Gob') Rock/Metal
 ('The Moon And I (Ordinary Day Album Version)', 'Jeff And Sheri Easter') Country
 """
-weight = [np.array([1,1,1,1,1,1,1,1]),np.array([1,1,1,1/200,1,1/10,1,1]),np.array([0,0,0,0,0,0,0,1]),np.array([1,1,1,1/200,1,1/10,0,1]),np.array([1,1,1,1/200,1,1/10,1,.01]),np.array([0,0,0,1/200,1,1/10,1,1]),np.array([0,0,0,1/200,1,1/10,1,1/100]),np.array([1/10,1/10,1/10,1/200,1,1/10,1,2]),np.array([1,1,1,1,1,1,1,5]),np.array([1,0,1,.01,.4,.3,.3,.1])]
+weight = [np.array([1,1,1,1,1,1,1,1,1]),np.array([1,1,1,1,1/200,1,1/10,1,.01]),np.array([1,1,1,1,1/200,1,1/10,1,1]),np.array([0,0,0,0,0,0,0,0,1]),np.array([1,1,1,1,1/200,1,1/10,0,1]),np.array([1,0,0,0,1/200,1,1/10,1,1]),np.array([1,0,0,0,1/200,1,1/10,1,1/100]),np.array([1,1/10,1/10,1/10,1/200,1,1/10,1,2]),np.array([1,1,1,1,1,1,1,1,5]),np.array([1,1,0,1,.01,.4,.3,.3,.1])]
 for weights in weight:
 
-    data = np.load('500Songs.npy')
+    data = np.load('TestCase.npy')
+    data = data[:,2:]
     print("Data loaded")
 
     num_songs = data.shape[0]
-    num_songs_to_cluster = 6
+    num_songs_to_cluster = 14
     tms = [None] * num_songs_to_cluster
     converted = [None] * num_songs_to_cluster
     for i in range(0, num_songs_to_cluster):
-        tms[i] = tm_cl.reconstruct(data[i][7:])
-        converted[i]= data[i][0:2].astype(np.float64)
-        converted[i] = np.concatenate((converted[i], data[i][3:7].astype(np.float64)))
-        converted[i] = np.concatenate((converted[i], [set(data[i][2].decode('UTF-8').split('\t'))]))
+        tms[i] = tm_cl.reconstruct(data[i][8:])
+        converted[i]= data[i][0:3].astype(np.float64)
+        converted[i] = np.concatenate((converted[i], data[i][4:8].astype(np.float64)))
+        converted[i] = np.concatenate((converted[i], [set(data[i][3].decode('UTF-8').split('\t'))]))
     converted = np.array(converted)
 
-    tag_diffs = weights[6]*tag_differences(converted[:,6])
+    tag_diffs = weights[7]*tag_differences(converted[:,6])
     print("Data processed, tag matrix calculated")
 
-    mfcc_diffs = weights[7]*MFCC_dists(tms)
+    mfcc_diffs = weights[8]*MFCC_dists(tms)
     print("MFCC matrix calculated")
-    print(converted[:,0:6])
+    print(converted[:,0:7])
     print(mfcc_diffs)
-    converted = np.dot(converted[:,0:6],np.diag(weights[0:6]))
-    cs, mus, cluster_mfcc_dists, cluster_tag_dists = k_means(converted[0:num_songs_to_cluster], 2, 20, mfcc_diffs, tag_diffs)
-
+    converted = np.dot(converted[:,0:7],np.diag(weights[0:7]))
+    cs, mus, cluster_mfcc_dists, cluster_tag_dists = k_means2(converted[0:num_songs_to_cluster], 3, 20, mfcc_diffs, tag_diffs)
     print(cs)
+
 
