@@ -143,8 +143,11 @@ weight = [np.array([1,1,1,1,1,1,1,1,1]),np.array([1,1,1,1,1/200,1,1/10,1,.01]),n
 for weights in weight:
 
     data = np.load('TestCase.npy')
-    data = data[:,2:]
-    print("Data loaded")
+    new_data = []
+    for i in data:
+        new_data.append(i[2:])
+    new_data = np.array(new_data)
+    data = new_data
 
     num_songs = data.shape[0]
     num_songs_to_cluster = 14
@@ -157,7 +160,7 @@ for weights in weight:
         converted[i] = np.concatenate((converted[i], [set(data[i][3].decode('UTF-8').split('\t'))]))
     converted = np.array(converted)
 
-    tag_diffs = weights[7]*tag_differences(converted[:,6])
+    tag_diffs = weights[7]*tag_differences(converted[:,7])
     print("Data processed, tag matrix calculated")
 
     mfcc_diffs = weights[8]*MFCC_dists(tms)
