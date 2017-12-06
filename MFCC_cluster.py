@@ -9,6 +9,9 @@ def reconstruct(tm_flat):
 	return(np.reshape(tm_flat, (-1, int(tm_flat.shape[0]/12))))
 
 def cluster_song(tm, threshhold = 10, min_clusters = 4, max_it = 100):
+	kmeans = KMeans(n_clusters = 7).fit(tm)
+	return kmeans.cluster_centers_, kmeans.labels_, tm
+	'''
 	# TUNE THESE
 	#.0001 increases the spread of numbers of clusters, but not the mean number.
 	threshold = 1000
@@ -80,7 +83,7 @@ def cluster_song(tm, threshhold = 10, min_clusters = 4, max_it = 100):
 			labels[i] -= ind
 	keep = np.array(keep)
 
-	return np.array(new_centroids), np.array(labels)[keep], tm[keep,:]
+	return np.array(new_centroids), np.array(labels)[keep], tm[keep,:]'''
 
 
 def assign(original_index, usable, centroids):
