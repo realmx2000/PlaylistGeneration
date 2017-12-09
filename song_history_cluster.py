@@ -1,59 +1,92 @@
 import numpy as np
 from numpy import newaxis
 from sklearn.cluster import KMeans
+import pickle
 
 import MFCC_cluster as tm_cl
 
-
-# Accepts mfcc matrices (reconstructed, not cloud)
-def MFCC_dists(mfccs):
+def get_mfcc_params(mfccs):
     num_songs = len(mfccs)
-    dist_matrix = np.zeros((num_songs, num_songs))
-
     centers = [None] * num_songs
     labels = [None] * num_songs
     cloud = [None] * num_songs
+
     for i in range(num_songs):
         cloud[i] = tm_cl.generate_cloud(mfccs[i].astype(float), 5)
         centers[i], labels[i], cloud[i] = tm_cl.cluster_song(cloud[i])
         cloud[i] = cloud[i].T
         centers[i] = centers[i].T
 
-    for i in range(num_songs):
+    return centers, labels, cloud
+
+def get_covariances(centers, labels, cloud, i):
+    num_clusters_i = centers[i].shape[1]
+    covs = [None] * num_clusters_i
+    for l in range(num_clusters_i):
+        covs[l] = diag_cov(cloud[i][:, labels[i] == l])
+    covs = np.array(covs)
+    return covs
+
+def get_counts(labels):
+    counts = {}
+    for w in labels:
+        if w not in counts:
+            counts[w] = 0
+        counts[w] += 1
+    return counts
+
+def custom_MFCC_dists(mfccs1, mfccs2, FSS):
+    dist_matrix = np.zeros((num_songs1, num_songs2))
+    centers1, labels1, cloud1 = get_mfcc_params(mfccs1)
+    centers2, labels2, cloud2 = get_mfcc_params(mfccs2)
+
+    for i in range(len(mfccs1)):
         print("Distance from %d" % i)
-        num_clusters_i = centers[i].shape[1]
-        covs1 = [None] * num_clusters_i
-        for l in range(num_clusters_i):
-            covs1[l] = diag_cov(cloud[i][:,labels[i] == l])
-        covs1 = np.array(covs1)
+        if FSS:
+            covs1 = get_covariances(centers1, labels1, cloud1, i)
 
-        counts1 = {}
-        for w in labels[i]:
-            if w not in counts1:
-                counts1[w] = 0
-            counts1[w] += 1
+        counts1 = get_counts(labels1[i])
 
-        for j in range(i+1, num_songs):
+        for j in range(len(mfccs2)):
             print("To %d" % j)
 
-            counts2 = {}
-            for w in labels[j]:
-                if w not in counts2:
-                    counts2[w] = 0
-                counts2[w] += 1
+            counts2 = get_counts(labels2[j])
+            if FSS:
+                covs2 = get_covariances(centers2, labels2, cloud2, j)
+                priors1 = tm_cl.maximize_priors(cloud1[i].T, centers1[i], covs1)
+                priors2 = tm_cl.maximize_priors(cloud2[j].T, centers2[j], covs2)
+                dist_matrix[i,j] = tm_cl.calculate_distance(priors1, priors2, centers[i], centers[j], covs1, covs2)
+            else:
+                dist_matrix[i,j] = tm_cl.total_cen_distance(centers1[i], centers2[j])
+    return dist_matrix
 
-            num_clusters_j = centers[j].shape[1]
-            covs2 = [None] * num_clusters_j
-            for m in range(num_clusters_j):
-                covs2[m] = diag_cov(cloud[j][:,labels[j] == m])
-            covs2 = np.array(covs2)
+# Accepts mfcc matrices (reconstructed, not cloud)
+def MFCC_dists(mfccs, FSS):
+    num_songs = len(mfccs)
+    dist_matrix = np.zeros((num_songs, num_songs))
 
-            priors1 = tm_cl.maximize_priors(cloud[i].T, centers[i], covs1)
-            priors2 = tm_cl.maximize_priors(cloud[j].T, centers[j], covs2)
+    centers, labels, cloud = get_mfcc_params(mfccs)
 
-            dist_matrix[i,j] = tm_cl.calculate_distance(priors1, priors2, centers[i], centers[j], covs1, covs2)
+    for i in range(num_songs):
+        print("Distance from %d" % i)
+        if FSS:
+            covs1 = get_covariances(centers, labels, cloud, i)
+
+        counts1 = get_counts(labels[i])
+
+        for j in range(i + 1, num_songs):
+            print("To %d" % j)
+            counts2 = get_counts(labels[j])
+
+            if FSS:
+                covs2 = get_covariances(centers, labels, cloud, j)
+                priors1 = tm_cl.maximize_priors(cloud[i].T, centers[i], covs1)
+                priors2 = tm_cl.maximize_priors(cloud[j].T, centers[j], covs2)
+                dist_matrix[i,j] = tm_cl.calculate_distance(priors1, priors2, centers[i], centers[j], covs1, covs2)
+            else:
+                dist_matrix[i,j] = tm_cl.total_cen_distance(centers[i], centers[j])
             dist_matrix[j,i] = dist_matrix[i,j]
-    return(dist_matrix)
+    return dist_matrix
 
 def diag_cov(data):
     variances = np.var(data, axis=1)
@@ -110,7 +143,18 @@ def k_means(data, c_count, max_iter, dist_matrix, tag_matrix):
 
     return cs, mus, cluster_mfcc_dists, cluster_tag_dists
 
+def cluster_history(history, tms):
+    tag_diffs = weights[7] * tag_differences(history[:, 7])
+    print("Data processed, tag matrix calculated")
 
+    mfcc_diffs = weights[8] * MFCC_dists(tms, False)
+    pickle.dump(mfcc_diffs, open('distances.pickle', 'wb'))
+    print("MFCC matrix calculated")
+    #print(history[:,0:7])
+    #print(mfcc_diffs)
+    history = np.dot(history[:,0:7],np.diag(weights[0:7]))
+    cs, mus, cluster_mfcc_dists, cluster_tag_dists = k_means(history[0:num_songs_to_cluster], 3, 20, mfcc_diffs, tag_diffs)
+    return cs, mus, cluster_mfcc_dists, cluster_tag_dists
 
 
 # Script
@@ -167,10 +211,11 @@ for weights in weight:
     tag_diffs = weights[7]*tag_differences(converted[:,7])
     print("Data processed, tag matrix calculated")
 
-    mfcc_diffs = weights[8]*MFCC_dists(tms)
+    mfcc_diffs = weights[8]*MFCC_dists(tms, True)
+    pickle.dump(mfcc_diffs, open('distances.pickle', 'wb'))
     print("MFCC matrix calculated")
-    print(converted[:,0:7])
+    #print(converted[:,0:7])
     print(mfcc_diffs)
-    converted = np.dot(converted[:,0:7],np.diag(weights[0:7]))
-    cs, mus, cluster_mfcc_dists, cluster_tag_dists = k_means(converted[0:num_songs_to_cluster], 3, 20, mfcc_diffs, tag_diffs)
-    print(cs)
+    #converted = np.dot(converted[:,0:7],np.diag(weights[0:7]))
+    #cs, mus, cluster_mfcc_dists, cluster_tag_dists = k_means(converted[0:num_songs_to_cluster], 3, 20, mfcc_diffs, tag_diffs)
+    #print(cs)

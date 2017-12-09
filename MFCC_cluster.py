@@ -102,7 +102,6 @@ def generate_cloud(timbre_matrix, window_length):
 		vector = timbre_matrix[:,index:index + window_length].flatten()
 		deltas = timbre_matrix[:,index+window_length] - timbre_matrix[:,index]
 		vectors[index,:] = np.concatenate((vector,deltas))
-		prev_vector = vector
 	return(vectors)
 
 
@@ -224,3 +223,15 @@ def likelihood(priors1, priors2, means1, means2, covariances):
 		likelihood_a = sp.logsumexp(a=likelihoods_b)
 		likelihood += weight_a * likelihood_a
 	return likelihood
+
+def total_cen_distance(means1, means2):
+	return 2*centroid_distance(means1, means2) - centroid_distance(means1, means1) - centroid_distance(means2, means2)
+
+def centroid_distance(means1, means2):
+	dist = 0
+	for i in range(means1.shape[1]):
+		for j in range(means2.shape[1]):
+			diff = means1[:,i] - means2[:,j]
+			dist += np.dot(diff, diff.T)
+	dist /= (means1.shape[1] * means2.shape[1])
+	return dist
