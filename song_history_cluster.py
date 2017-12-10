@@ -36,6 +36,8 @@ def get_counts(labels):
     return counts
 
 def custom_MFCC_dists(mfccs1, mfccs2, FSS):
+    num_songs1 = len(mfccs1)
+    num_songs2 = len(mfccs2)
     dist_matrix = np.zeros((num_songs1, num_songs2))
     centers1, labels1, cloud1 = get_mfcc_params(mfccs1)
     centers2, labels2, cloud2 = get_mfcc_params(mfccs2)
@@ -143,12 +145,13 @@ def k_means(data, c_count, max_iter, dist_matrix, tag_matrix):
 
     return cs, mus, cluster_mfcc_dists, cluster_tag_dists
 
-def cluster_history(history, tms):
+def cluster_history(history, tms, weights, num_songs_to_cluster):
+    #TODO: Tag Differences
     tag_diffs = weights[7] * tag_differences(history[:, 7])
     print("Data processed, tag matrix calculated")
 
-    mfcc_diffs = weights[8] * MFCC_dists(tms, False)
-    pickle.dump(mfcc_diffs, open('distances.pickle', 'wb'))
+    mfcc_diffs = weights[8] * MFCC_dists(tms, False) #TODO: Switch back to true
+    #pickle.dump(mfcc_diffs, open('distances.pickle', 'wb'))
     print("MFCC matrix calculated")
     #print(history[:,0:7])
     #print(mfcc_diffs)
@@ -156,6 +159,26 @@ def cluster_history(history, tms):
     cs, mus, cluster_mfcc_dists, cluster_tag_dists = k_means(history[0:num_songs_to_cluster], 3, 20, mfcc_diffs, tag_diffs)
     return cs, mus, cluster_mfcc_dists, cluster_tag_dists
 
+def load_data(name, num_songs_to_cluster):
+    data = np.load(name, encoding='bytes')
+    if num_songs_to_cluster == 0:
+        num_songs_to_cluster = data.shape[0]
+    new_data = []
+    for i in data:
+        new_data.append(i[2:])
+    new_data = np.array(new_data)
+    data = new_data
+
+    num_songs = data.shape[0]
+    tms = [None] * num_songs_to_cluster
+    converted = [None] * num_songs_to_cluster
+    for i in range(0, num_songs_to_cluster):
+        tms[i] = tm_cl.reconstruct(data[i][8:])
+        converted[i]= data[i][0:3].astype(np.float64)
+        converted[i] = np.concatenate((converted[i], data[i][4:8].astype(np.float64)))
+        converted[i] = np.concatenate((converted[i], [set(data[i][3].decode('UTF-8').split('\t'))]))
+    converted = np.array(converted)
+    return converted, tms
 
 # Script
 
@@ -187,35 +210,10 @@ def cluster_history(history, tms):
 """
 #weight = [np.array([1,1,1,1,1,1,1,1,1]),np.array([1,1,1,1,1/200,1,1/10,1,.01]),np.array([1,1,1,1,1/200,1,1/10,1,1]),np.array([0,0,0,0,0,0,0,0,1]),np.array([1,1,1,1,1/200,1,1/10,0,1]),np.array([1,0,0,0,1/200,1,1/10,1,1]),np.array([1,0,0,0,1/200,1,1/10,1,1/100]),np.array([1,1/10,1/10,1/10,1/200,1,1/10,1,2]),np.array([1,1,1,1,1,1,1,1,5]),np.array([1,1,0,1,.01,.4,.3,.3,.1])]
 #weight = [np.array([1, 0, 0, 0, 0, 0, 1, 1, 0.1])]
+
 weight = [np.array([0, 0, 0, 0, 0, 0, 0, 0, 1])]
+num_songs_to_cluster=14
+converted, tms = load_data('TestCase.npy', num_songs_to_cluster)
+
 for weights in weight:
-
-    data = np.load('TestCase.npy')
-    new_data = []
-    for i in data:
-        new_data.append(i[2:])
-    new_data = np.array(new_data)
-    data = new_data
-
-    num_songs = data.shape[0]
-    num_songs_to_cluster = 14
-    tms = [None] * num_songs_to_cluster
-    converted = [None] * num_songs_to_cluster
-    for i in range(0, num_songs_to_cluster):
-        tms[i] = tm_cl.reconstruct(data[i][8:])
-        converted[i]= data[i][0:3].astype(np.float64)
-        converted[i] = np.concatenate((converted[i], data[i][4:8].astype(np.float64)))
-        converted[i] = np.concatenate((converted[i], [set(data[i][3].decode('UTF-8').split('\t'))]))
-    converted = np.array(converted)
-
-    tag_diffs = weights[7]*tag_differences(converted[:,7])
-    print("Data processed, tag matrix calculated")
-
-    mfcc_diffs = weights[8]*MFCC_dists(tms, True)
-    pickle.dump(mfcc_diffs, open('distances.pickle', 'wb'))
-    print("MFCC matrix calculated")
-    #print(converted[:,0:7])
-    print(mfcc_diffs)
-    #converted = np.dot(converted[:,0:7],np.diag(weights[0:7]))
-    #cs, mus, cluster_mfcc_dists, cluster_tag_dists = k_means(converted[0:num_songs_to_cluster], 3, 20, mfcc_diffs, tag_diffs)
-    #print(cs)
+    cs, mus, cluster_mfcc_dists, cluster_tag_dists = cluster_history(converted, tms, weights, num_songs_to_cluster)

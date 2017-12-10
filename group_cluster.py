@@ -2,6 +2,7 @@ import numpy as np
 import song_history_cluster as ind_cluster
 import MFCC_cluster as tm_cl
 
+'''
 def reconstruct(data):
     tms = [None] * len(data)
     for i in range(0, num_songs_to_cluster):
@@ -9,11 +10,9 @@ def reconstruct(data):
     return tms
 
 #Calculates MFCC distance matrix
-def calculate_all_distances(songs, playlist, weight, FSS):
-    songs_tms = reconstruct(songs)
-    playlist_tms = reconstruct(playlist)
-    mfcc_diffs = weight*ind_clusters.custom_MFCC_dists(songs_tms, playlist_tms, FSS)
-    return mfcc_diffs
+def calculate_all_distances(songs, songs_tms, playlist, playlist_tms, weight, FSS):
+     return weight*ind_cluster.custom_MFCC_dists(songs_tms, playlist_tms, FSS)
+'''
 
 #Note that MFCC_dists should be the single row of the matrix corresponding to song.
 #Returns sum of distances to all clusters
@@ -24,10 +23,10 @@ def calculate_cluster_dist(song, means, clusterings, mfcc_dists, weights):
         dist += np.dot(weighted_song, means[cluster].T)
         avg_mfcc_dist = 0
         n = 0
-        for id in range(clusterings):
+        for id in range(len(clusterings)):
             if clusterings[id] == cluster:
                 n += 1
-                avg_mfcc_dist += mfcc_dists[id]
+                avg_mfcc_dist += mfcc_dists[cluster]
         avg_mfcc_dist /= n
         dist += avg_mfcc_dist
 
@@ -55,36 +54,50 @@ def lcm(nums):
         gcd = euclid(lcm, num)
         prod = lcm * num
         lcm = prod/gcd
-    return lcm
+    return int(lcm)
 
-def generate_full_history(histories):
-    lengths = np.zeros((1, len(histories)))
+def generate_full_history(histories, histories_tms):
+    lengths = np.zeros((len(histories))).astype(int)
     for user in range(len(histories)):
         lengths[user] = histories[user].shape[0]
-    lcm = lcm(lengths)
-    multiples = lcm / lengths
+    least_multiple = lcm(lengths)
+    multiples = (least_multiple / lengths).astype(int)
     full_history = []
+    full_tms = []
     for user in range(len(histories)):
-        for _ in range(multiples[user]):
-            full_history = np.concatenate((full_history, histories[user]), axis=0)
-    return full_history
+        for multiple in range(multiples[user]):
+            full_history.extend(histories[user])
+            full_tms.extend(histories_tms[user])
+    full_history = np.array(full_history)
+    return full_history, full_tms
 
-def find_nearest(songs, histories, n, weights):
-    history = generate_full_history(histories)
-    tms = reconstruct(history)
-    cs, mus, cluster_mfcc_dists, cluster_tag_dists = ind_cluster.cluster_history(history, tms)
+def find_nearest(songs, histories, songs_tms, histories_tms, n, weights):
+    history, tms = generate_full_history(histories, histories_tms)
+    cs, mus, cluster_mfcc_dists, cluster_tag_dists = ind_cluster.cluster_history(history, tms, weights, len(history))
 
-    mfcc_dists = calculate_all_distances(songs, history, weights[8], False)
-    cluster_dists = np.zeros((1, songs.shape[0]))
+    mfcc_dists = weights[8] * ind_cluster.custom_MFCC_dists(songs_tms, tms, False)
+    cluster_dists = np.zeros(songs.shape[0])
     for song in range(songs.shape[0]):
-        cluster_dists[song] = calculate_cluster_dist(songs[song, :], mus, cs, mfcc_dists, weights)
+        cluster_dists[song] = calculate_cluster_dist(songs[song], mus, cs, mfcc_dists[song], weights)
     scope = int(round(1.5 * n))
     arg_approx_smallest = np.argpartition(cluster_dists, scope)[:scope]
 
     heuristic_nearest = songs[arg_approx_smallest]
-    mfcc_dists = calculate_all_distances(heuristic_nearest, history, weights[8], True)
+    heuristic_tms = songs_tms[arg_approx_smallest]
+    mfcc_dists = calculate_all_distances(heuristic_tms, history, weights[8], True)
     cluster_dists = np.zeros((1, scope))
     for song in range(scope):
         cluster_dists[song] = calculate_cluster_dist(heuristic_nearest[song, :], mus, cs, mfcc_dists, weights)
     arg_smallest = np.argpartition(cluster_dists, n)[:n]
+
     return songs[arg_smallest]
+
+songs, song_tms = ind_cluster.load_data('TestCase.npy', 0)
+num_histories = 3
+histories = [None] * num_histories
+histories_tms = [None] * num_histories
+for i in range(num_histories):
+    histories[i], histories_tms[i] = ind_cluster.load_data('history' + str(i) + '.npy', 0)
+n = 10
+weights = [1,1,1,1,1,1,1,1,1,1]
+playlist = find_nearest(songs, histories, song_tms, histories_tms, n, weights)
