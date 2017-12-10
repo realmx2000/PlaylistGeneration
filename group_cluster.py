@@ -83,21 +83,24 @@ def find_nearest(songs, histories, songs_tms, histories_tms, n, weights):
     arg_approx_smallest = np.argpartition(cluster_dists, scope)[:scope]
 
     heuristic_nearest = songs[arg_approx_smallest]
-    heuristic_tms = songs_tms[arg_approx_smallest]
-    mfcc_dists = calculate_all_distances(heuristic_tms, history, weights[8], True)
-    cluster_dists = np.zeros((1, scope))
+    heuristic_tms = []
+    for index in arg_approx_smallest:
+        heuristic_tms.append(songs_tms[index])
+    mfcc_dists = weights[8] * ind_cluster.custom_MFCC_dists(heuristic_tms, tms, False)#Change back to true
+    cluster_dists = np.zeros(scope)
     for song in range(scope):
-        cluster_dists[song] = calculate_cluster_dist(heuristic_nearest[song, :], mus, cs, mfcc_dists, weights)
+        cluster_dists[song] = calculate_cluster_dist(heuristic_nearest[song, :], mus, cs, mfcc_dists[song], weights)
     arg_smallest = np.argpartition(cluster_dists, n)[:n]
 
-    return songs[arg_smallest]
+    return arg_smallest
 
 songs, song_tms = ind_cluster.load_data('TestCase.npy', 0)
-num_histories = 3
+num_histories = 2
 histories = [None] * num_histories
 histories_tms = [None] * num_histories
 for i in range(num_histories):
     histories[i], histories_tms[i] = ind_cluster.load_data('history' + str(i) + '.npy', 0)
-n = 10
-weights = [1,1,1,1,1,1,1,1,1,1]
-playlist = find_nearest(songs, histories, song_tms, histories_tms, n, weights)
+n = 4
+weights = [1,1,1,1,1,1,1,1,1/100000,1]
+playlist_indicies = find_nearest(songs, histories, song_tms, histories_tms, n, weights)
+print(playlist)

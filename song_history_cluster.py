@@ -57,7 +57,7 @@ def custom_MFCC_dists(mfccs1, mfccs2, FSS):
                 covs2 = get_covariances(centers2, labels2, cloud2, j)
                 priors1 = tm_cl.maximize_priors(cloud1[i].T, centers1[i], covs1)
                 priors2 = tm_cl.maximize_priors(cloud2[j].T, centers2[j], covs2)
-                dist_matrix[i,j] = tm_cl.calculate_distance(priors1, priors2, centers[i], centers[j], covs1, covs2)
+                dist_matrix[i,j] = tm_cl.calculate_distance(priors1, priors2, centers1[i], centers2[j], covs1, covs2)
             else:
                 dist_matrix[i,j] = tm_cl.total_cen_distance(centers1[i], centers2[j])
     return dist_matrix

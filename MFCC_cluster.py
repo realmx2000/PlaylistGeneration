@@ -186,7 +186,7 @@ def calculate_posteriors(data, means, covariances, priors):
 		for j in range(means.shape[1]):
 			mean = means[:,j]
 			covariance = covariances[j,:,:]
-			prior = priors[0,j]
+			prior = priors[0,j] #+ 1e-100
 			log_like = multivariate_normal.logpdf(x, mean, covariance)
 			posterior = np.log(prior) + log_like
 			posteriors[i,j] = posterior
