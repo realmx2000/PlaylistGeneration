@@ -2,20 +2,7 @@ import numpy as np
 import song_history_cluster as ind_cluster
 import MFCC_cluster as tm_cl
 
-'''
-def reconstruct(data):
-    tms = [None] * len(data)
-    for i in range(0, num_songs_to_cluster):
-        tms[i] = tm_cl.reconstruct(data[i][8:])
-    return tms
-
-#Calculates MFCC distance matrix
-def calculate_all_distances(songs, songs_tms, playlist, playlist_tms, weight, FSS):
-     return weight*ind_cluster.custom_MFCC_dists(songs_tms, playlist_tms, FSS)
-'''
-
-#Note that MFCC_dists should be the single row of the matrix corresponding to song.
-#Returns sum of distances to all clusters
+#Calculates the sum of distances from a song to the centroids
 def calculate_cluster_dist(song, means, clusterings, mfcc_dists, weights):
     dist = 0
     weighted_song = song[0:7] * weights[0:7]
@@ -32,7 +19,7 @@ def calculate_cluster_dist(song, means, clusterings, mfcc_dists, weights):
 
     return dist
 
-#Euclidean algorithm, returns gcd
+#Calculates GCD of two numbers using the Euclidean Algorithm.
 def euclid(num1, num2):
     if num1 == 0:
         return num2
@@ -46,6 +33,7 @@ def euclid(num1, num2):
         r1 = num2
     return euclid(r1, r2)
 
+#Finds the LCM of two numbers
 def lcm(nums):
     gcd = euclid(nums[0], nums[1])
     prod = nums[0] * nums[1]
@@ -56,6 +44,9 @@ def lcm(nums):
         lcm = prod/gcd
     return int(lcm)
 
+#Generates a single history by weighting individual histories by their length
+#and joining them together. In future iterations this should be replaced by
+#weighted k-means.
 def generate_full_history(histories, histories_tms):
     lengths = np.zeros((len(histories))).astype(int)
     for user in range(len(histories)):
@@ -71,6 +62,9 @@ def generate_full_history(histories, histories_tms):
     full_history = np.array(full_history)
     return full_history, full_tms
 
+#Finds the n songs from songs that are closest to histories and returns their indicies.
+#First uses centroid distance as a heuristic to restrict the search space, then uses
+#the full FSS calculation.
 def find_nearest(songs, histories, songs_tms, histories_tms, n, weights):
     history, tms = generate_full_history(histories, histories_tms)
     cs, mus, cluster_mfcc_dists, cluster_tag_dists = ind_cluster.cluster_history(history, tms, weights, len(history))
@@ -79,6 +73,7 @@ def find_nearest(songs, histories, songs_tms, histories_tms, n, weights):
     cluster_dists = np.zeros(songs.shape[0])
     for song in range(songs.shape[0]):
         cluster_dists[song] = calculate_cluster_dist(songs[song], mus, cs, mfcc_dists[song], weights)
+    pickle.dump(cluster_dists, open('centroid_cluster_dists.pickle', 'wb'))
     scope = int(round(1.5 * n))
     arg_approx_smallest = np.argpartition(cluster_dists, scope)[:scope]
 
@@ -90,17 +85,21 @@ def find_nearest(songs, histories, songs_tms, histories_tms, n, weights):
     cluster_dists = np.zeros(scope)
     for song in range(scope):
         cluster_dists[song] = calculate_cluster_dist(heuristic_nearest[song, :], mus, cs, mfcc_dists[song], weights)
+    pickle.dump(cluster_dists, open('FSS_cluster_dists.pickle', 'wb'))
     arg_smallest = np.argpartition(cluster_dists, n)[:n]
 
     return arg_smallest
 
-songs, song_tms = ind_cluster.load_data('TestCase.npy', 0)
+#Parameters
+n = 8
+weights = [1,1,1,1,1,1,1,0,1/100000]
 num_histories = 2
+
+songs, song_tms, titles = ind_cluster.load_data('TestCase.npy', 0)
 histories = [None] * num_histories
 histories_tms = [None] * num_histories
 for i in range(num_histories):
-    histories[i], histories_tms[i] = ind_cluster.load_data('history' + str(i) + '.npy', 0)
-n = 4
-weights = [1,1,1,1,1,1,1,1,1/100000,1]
+    histories[i], histories_tms[i], _ = ind_cluster.load_data('history' + str(i) + '.npy', 0)
 playlist_indicies = find_nearest(songs, histories, song_tms, histories_tms, n, weights)
-print(playlist)
+for index in playlist_indicies:
+    print(titles[index])
