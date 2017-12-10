@@ -1,4 +1,6 @@
 import numpy as np
+import pickle
+
 import song_history_cluster as ind_cluster
 import MFCC_cluster as tm_cl
 

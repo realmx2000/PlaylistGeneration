@@ -5,6 +5,7 @@ import pickle
 
 import MFCC_cluster as tm_cl
 
+#Processes the MFCC matrix into a GMM
 def get_mfcc_params(mfccs):
     num_songs = len(mfccs)
     centers = [None] * num_songs
@@ -19,6 +20,7 @@ def get_mfcc_params(mfccs):
 
     return centers, labels, cloud
 
+#Gets the diagonal covariances for each Gaussian in the GMM.
 def get_covariances(centers, labels, cloud, i):
     num_clusters_i = centers[i].shape[1]
     covs = [None] * num_clusters_i
@@ -27,15 +29,6 @@ def get_covariances(centers, labels, cloud, i):
     covs = np.array(covs)
     return covs
 
-'''
-def get_counts(labels):
-    counts = {}
-    for w in labels:
-        if w not in counts:
-            counts[w] = 0
-        counts[w] += 1
-    return counts
-    '''
 #Calculate distance matrix of MFCC distances, using FSS or Centroid Distance.
 def custom_MFCC_dists(mfccs1, mfccs2, FSS):
     num_songs1 = len(mfccs1)
