@@ -30,7 +30,7 @@ def get_covariances(centers, labels, cloud, i):
     return covs
 
 #Calculate distance matrix of MFCC distances, using FSS or Centroid Distance.
-def custom_MFCC_dists(mfccs1, mfccs2, FSS):
+def custom_MFCC_dists(mfccs1, mfccs2, copies, FSS):
     num_songs1 = len(mfccs1)
     num_songs2 = len(mfccs2)
     dist_matrix = np.zeros((num_songs1, num_songs2))
@@ -45,6 +45,9 @@ def custom_MFCC_dists(mfccs1, mfccs2, FSS):
         for j in range(len(mfccs2)):
             print("To %d" % j)
 
+            if dist_matrix[i,j] != 0:
+                continue
+
             if FSS:
                 covs2 = get_covariances(centers2, labels2, cloud2, j)
                 priors1 = tm_cl.maximize_priors(cloud1[i].T, centers1[i], covs1)
@@ -52,10 +55,14 @@ def custom_MFCC_dists(mfccs1, mfccs2, FSS):
                 dist_matrix[i,j] = tm_cl.calculate_distance(priors1, priors2, centers1[i], centers2[j], covs1, covs2)
             else:
                 dist_matrix[i,j] = tm_cl.total_cen_distance(centers1[i], centers2[j])
+
+            if i in copies:
+                for copy in copies[i]:
+                    dist_matrix[copy,j] = dist_matrix[i,j]
     return dist_matrix
 
 #Calculates MFCC Distances between a set of MFCC's and itself using FSS or Centroid Distance.
-def MFCC_dists(mfccs, FSS):
+def MFCC_dists(mfccs, copies, FSS):
     num_songs = len(mfccs)
     dist_matrix = np.zeros((num_songs, num_songs))
 
@@ -69,6 +76,9 @@ def MFCC_dists(mfccs, FSS):
         for j in range(i + 1, num_songs):
             print("To %d" % j)
 
+            if dist_matrix[i,j] != 0:
+                continue
+
             if FSS:
                 covs2 = get_covariances(centers, labels, cloud, j)
                 priors1 = tm_cl.maximize_priors(cloud[i].T, centers[i], covs1)
@@ -77,6 +87,11 @@ def MFCC_dists(mfccs, FSS):
             else:
                 dist_matrix[i,j] = tm_cl.total_cen_distance(centers[i], centers[j])
             dist_matrix[j,i] = dist_matrix[i,j]
+
+            if i in copies:
+                for copy in copies[i]:
+                    dist_matrix[copy,j] = dist_matrix[i,j]
+                    dist_matrix[j,copy] = dist_matrix[i,j]
     return dist_matrix
 
 #Calculates a diagonal covariance matrix for the data
@@ -84,7 +99,21 @@ def diag_cov(data):
     variances = np.var(data, axis=1)
     return np.diag(variances)
 
-#Calculates the IOU of the tags
+#Calculates the IOU of two lists of tag lists
+def custom_tag_differences(tag_lists1, tag_lists2):
+    num_songs1 = len(tag_lists1)
+    num_songs2 = len(tag_lists2)
+    tag_matrix = np.zeros((num_songs1, num_songs2))
+    for i in range(num_songs1):
+        for j in range(num_songs2):
+            song1 = tag_lists1[i]
+            song2 = tag_lists2[j]
+            shared = len(song1[7] & song2[7])
+            total = len(song1[7] | song2[7])
+            tag_matrix[i,j] = 1 - (float(shared)/total)
+    return tag_matrix
+
+#Calculates the IOU of the tags with themselves
 def tag_differences(tag_lists):
     num_songs = len(tag_lists)
     tag_matrix = np.zeros((num_songs, num_songs))
@@ -137,14 +166,14 @@ def k_means(data, c_count, max_iter, dist_matrix, tag_matrix):
     return cs, mus, cluster_mfcc_dists, cluster_tag_dists
 
 #Clusters a set of songs. Returns the parameters of the clustering.
-def cluster_history(history, tms, weights, num_songs_to_cluster):
+def cluster_history(history, tms, weights, num_songs_to_cluster, copies={}):
     #TODO: Tag Differences
     tag_diffs = weights[7] * tag_differences(history[:, 7])
 
-    mfcc_diffs = weights[8] * MFCC_dists(tms, False) #TODO: Switch back to true
+    mfcc_diffs = weights[8] * MFCC_dists(tms, copies, False) #TODO: Switch back to true
     pickle.dump(mfcc_diffs, open('distances.pickle', 'wb'))
     history = np.dot(history[:,0:7],np.diag(weights[0:7]))
-    cs, mus, cluster_mfcc_dists, cluster_tag_dists = k_means(history[0:num_songs_to_cluster], 3, 20, mfcc_diffs, tag_diffs)
+    cs, mus, cluster_mfcc_dists, cluster_tag_dists = k_means(history[0:num_songs_to_cluster], 4, 200, mfcc_diffs, tag_diffs)
     return cs, mus, cluster_mfcc_dists, cluster_tag_dists
 
 #Loads songs in and formats the data.
@@ -202,10 +231,14 @@ def load_data(name, num_songs_to_cluster):
 #weight = [np.array([1, 0, 0, 0, 0, 0, 1, 1, 0.1])]
 
 '''
-weight = [np.array([0, 0, 0, 0, 0, 0, 0, 0, 1])]
-num_songs_to_cluster=14
-converted, tms, _ = load_data('TestCase.npy', num_songs_to_cluster)
+weight = np.array([.02,3,2.5,1,0.01,2,.14,0,0])
+num_songs_to_cluster=20
+converted, tms, _ = load_data('history0.npy', num_songs_to_cluster)
+converted1, tms1, _ = load_data('history3.npy', num_songs_to_cluster)
 
-for weights in weight:
-    cs, mus, cluster_mfcc_dists, cluster_tag_dists = cluster_history(converted, tms, weights, num_songs_to_cluster)
+cs, mus, cluster_mfcc_dists, cluster_tag_dists = cluster_history(converted, tms, weight, num_songs_to_cluster)
+cs1, mus1, cluster_mfcc_dists1, cluster_tag_dists1 = cluster_history(converted1, tms1, weight, num_songs_to_cluster)
+print(tm_cl.centroid_distance(mus, mus1))
+print(tm_cl.centroid_distance(mus, mus))
+print(tm_cl.centroid_distance(mus1, mus1))
 '''
