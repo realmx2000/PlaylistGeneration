@@ -8,16 +8,7 @@ import math
 def reconstruct(tm_flat):
 	return(np.reshape(tm_flat, (-1, int(tm_flat.shape[0]/12))))
 
-def cluster_song(tm, threshhold = 10, min_clusters = 4, max_it = 100):
-	kmeans = KMeans(n_clusters = 7).fit(tm)
-	return kmeans.cluster_centers_, kmeans.labels_, tm
-	'''
-	# TUNE THESE
-	#.0001 increases the spread of numbers of clusters, but not the mean number.
-	threshold = 1000
-	#Lots of songs naturally go to 1 cluster essentailly regardless of threshhold without this.
-	min_clusters = 1
-
+def cluster_song(tm, threshold = 1000, min_clusters = 4, max_it = 100):
 	kmeans = None
 	k = 30
 	first = True
@@ -49,9 +40,11 @@ def cluster_song(tm, threshhold = 10, min_clusters = 4, max_it = 100):
 			k = len(new_centroids)
 			centroids = new_centroids
 		distortion = new_distortion
+
 	if it == max_it:
 		kmeans = KMeans(n_clusters=k).fit(tm)
 		converged = True
+
 	if not converged:
 		kmeans = KMeans(n_clusters=k, init=centroids).fit(tm)
 		centroids = kmeans.cluster_centers_
@@ -62,6 +55,7 @@ def cluster_song(tm, threshhold = 10, min_clusters = 4, max_it = 100):
 	labels = list(kmeans.labels_)
 	counts = {}
 	new_centroids = []
+
 	for i in labels:
 		if i not in counts:
 			counts[i] = 0
@@ -83,8 +77,7 @@ def cluster_song(tm, threshhold = 10, min_clusters = 4, max_it = 100):
 			labels[i] -= ind
 	keep = np.array(keep)
 
-	return np.array(new_centroids), np.array(labels)[keep], tm[keep,:]'''
-
+	return np.array(new_centroids), np.array(labels)[keep], tm[keep,:]
 
 def assign(original_index, usable, centroids):
 	position = centroids[original_index]
@@ -102,9 +95,7 @@ def generate_cloud(timbre_matrix, window_length):
 		vector = timbre_matrix[:,index:index + window_length].flatten()
 		deltas = timbre_matrix[:,index+window_length] - timbre_matrix[:,index]
 		vectors[index,:] = np.concatenate((vector,deltas))
-		prev_vector = vector
 	return(vectors)
-
 
 def remove_one_clusters(kmeans):
 	centroids = kmeans.cluster_centers_
@@ -123,8 +114,6 @@ def remove_one_clusters(kmeans):
 			new_centroids.append(centroids[i])
 
 	return(new_centroids)
-
-
 
 def collapse_centroids(kmeans):
 	# TUNE THIS
@@ -165,7 +154,6 @@ def collapse_centroids(kmeans):
 
 	return(np.array(new_centroids))
 
-
 #M-step, but just with the priors.
 def maximize_priors(cloud, means, covariances):
 	priors = np.zeros((1, means.shape[1]))
@@ -187,14 +175,12 @@ def calculate_posteriors(data, means, covariances, priors):
 		for j in range(means.shape[1]):
 			mean = means[:,j]
 			covariance = covariances[j,:,:]
-			prior = priors[0,j]
+			prior = priors[0,j] + 1e-100
 			log_like = multivariate_normal.logpdf(x, mean, covariance)
 			posterior = np.log(prior) + log_like
 			posteriors[i,j] = posterior
 		posteriors[i,:] -= sp.logsumexp(posteriors[i,:])
 	return np.exp(posteriors)
-
-#Means and covariances can be calculated with np.mean and np.cov, respectively.
 
 #Calculates the fast spectral distance between two GMM models by using the 
 #cross similarity metric, normalized by the self similarity, as described in one of
@@ -224,3 +210,17 @@ def likelihood(priors1, priors2, means1, means2, covariances):
 		likelihood_a = sp.logsumexp(a=likelihoods_b)
 		likelihood += weight_a * likelihood_a
 	return likelihood
+
+#Calculates the total normalized centroid distance between two GMMs
+def total_cen_distance(means1, means2):
+	return 2*centroid_distance(means1, means2) - centroid_distance(means1, means1) - centroid_distance(means2, means2)
+
+#Calculates the normalized sum of centroid distances
+def centroid_distance(means1, means2):
+	dist = 0
+	for i in range(means1.shape[1]):
+		for j in range(means2.shape[1]):
+			diff = means1[:,i] - means2[:,j]
+			dist += np.dot(diff, diff.T)
+	dist /= (means1.shape[1] * means2.shape[1])
+	return dist

@@ -1,64 +1,119 @@
 import numpy as np
 from numpy import newaxis
 from sklearn.cluster import KMeans
+import pickle
 
 import MFCC_cluster as tm_cl
 
-
-# Accepts mfcc matrices (reconstructed, not cloud)
-def MFCC_dists(mfccs):
+#Processes the MFCC matrix into a GMM
+def get_mfcc_params(mfccs):
     num_songs = len(mfccs)
-    dist_matrix = np.zeros((num_songs, num_songs))
-
     centers = [None] * num_songs
     labels = [None] * num_songs
     cloud = [None] * num_songs
+
     for i in range(num_songs):
         cloud[i] = tm_cl.generate_cloud(mfccs[i].astype(float), 5)
         centers[i], labels[i], cloud[i] = tm_cl.cluster_song(cloud[i])
         cloud[i] = cloud[i].T
         centers[i] = centers[i].T
 
-    for i in range(num_songs):
+    return centers, labels, cloud
+
+#Gets the diagonal covariances for each Gaussian in the GMM.
+def get_covariances(centers, labels, cloud, i):
+    num_clusters_i = centers[i].shape[1]
+    covs = [None] * num_clusters_i
+    for l in range(num_clusters_i):
+        covs[l] = diag_cov(cloud[i][:, labels[i] == l])
+    covs = np.array(covs)
+    return covs
+
+#Calculate distance matrix of MFCC distances, using FSS or Centroid Distance.
+def custom_MFCC_dists(mfccs1, mfccs2, copies, FSS):
+    num_songs1 = len(mfccs1)
+    num_songs2 = len(mfccs2)
+    dist_matrix = np.zeros((num_songs1, num_songs2))
+    centers1, labels1, cloud1 = get_mfcc_params(mfccs1)
+    centers2, labels2, cloud2 = get_mfcc_params(mfccs2)
+
+    for i in range(len(mfccs1)):
         print("Distance from %d" % i)
-        num_clusters_i = centers[i].shape[1]
-        covs1 = [None] * num_clusters_i
-        for l in range(num_clusters_i):
-            covs1[l] = diag_cov(cloud[i][:,labels[i] == l])
-        covs1 = np.array(covs1)
+        if FSS:
+            covs1 = get_covariances(centers1, labels1, cloud1, i)
 
-        counts1 = {}
-        for w in labels[i]:
-            if w not in counts1:
-                counts1[w] = 0
-            counts1[w] += 1
-
-        for j in range(i+1, num_songs):
+        for j in range(len(mfccs2)):
             print("To %d" % j)
 
-            counts2 = {}
-            for w in labels[j]:
-                if w not in counts2:
-                    counts2[w] = 0
-                counts2[w] += 1
+            if dist_matrix[i,j] != 0:
+                continue
 
-            num_clusters_j = centers[j].shape[1]
-            covs2 = [None] * num_clusters_j
-            for m in range(num_clusters_j):
-                covs2[m] = diag_cov(cloud[j][:,labels[j] == m])
-            covs2 = np.array(covs2)
+            if FSS:
+                covs2 = get_covariances(centers2, labels2, cloud2, j)
+                priors1 = tm_cl.maximize_priors(cloud1[i].T, centers1[i], covs1)
+                priors2 = tm_cl.maximize_priors(cloud2[j].T, centers2[j], covs2)
+                dist_matrix[i,j] = tm_cl.calculate_distance(priors1, priors2, centers1[i], centers2[j], covs1, covs2)
+            else:
+                dist_matrix[i,j] = tm_cl.total_cen_distance(centers1[i], centers2[j])
 
-            priors1 = tm_cl.maximize_priors(cloud[i].T, centers[i], covs1)
-            priors2 = tm_cl.maximize_priors(cloud[j].T, centers[j], covs2)
+            if i in copies:
+                for copy in copies[i]:
+                    dist_matrix[copy,j] = dist_matrix[i,j]
+    return dist_matrix
 
-            dist_matrix[i,j] = tm_cl.calculate_distance(priors1, priors2, centers[i], centers[j], covs1, covs2)
+#Calculates MFCC Distances between a set of MFCC's and itself using FSS or Centroid Distance.
+def MFCC_dists(mfccs, copies, FSS):
+    num_songs = len(mfccs)
+    dist_matrix = np.zeros((num_songs, num_songs))
+
+    centers, labels, cloud = get_mfcc_params(mfccs)
+
+    for i in range(num_songs):
+        print("Distance from %d" % i)
+        if FSS:
+            covs1 = get_covariances(centers, labels, cloud, i)
+
+        for j in range(i + 1, num_songs):
+            print("To %d" % j)
+
+            if dist_matrix[i,j] != 0:
+                continue
+
+            if FSS:
+                covs2 = get_covariances(centers, labels, cloud, j)
+                priors1 = tm_cl.maximize_priors(cloud[i].T, centers[i], covs1)
+                priors2 = tm_cl.maximize_priors(cloud[j].T, centers[j], covs2)
+                dist_matrix[i,j] = tm_cl.calculate_distance(priors1, priors2, centers[i], centers[j], covs1, covs2)
+            else:
+                dist_matrix[i,j] = tm_cl.total_cen_distance(centers[i], centers[j])
             dist_matrix[j,i] = dist_matrix[i,j]
-    return(dist_matrix)
 
+            if i in copies:
+                for copy in copies[i]:
+                    dist_matrix[copy,j] = dist_matrix[i,j]
+                    dist_matrix[j,copy] = dist_matrix[i,j]
+    return dist_matrix
+
+#Calculates a diagonal covariance matrix for the data
 def diag_cov(data):
     variances = np.var(data, axis=1)
     return np.diag(variances)
 
+#Calculates the IOU of two lists of tag lists
+def custom_tag_differences(tag_lists1, tag_lists2):
+    num_songs1 = len(tag_lists1)
+    num_songs2 = len(tag_lists2)
+    tag_matrix = np.zeros((num_songs1, num_songs2))
+    for i in range(num_songs1):
+        for j in range(num_songs2):
+            song1 = tag_lists1[i]
+            song2 = tag_lists2[j]
+            shared = len(song1[7] & song2[7])
+            total = len(song1[7] | song2[7])
+            tag_matrix[i,j] = 1 - (float(shared)/total)
+    return tag_matrix
+
+#Calculates the IOU of the tags with themselves
 def tag_differences(tag_lists):
     num_songs = len(tag_lists)
     tag_matrix = np.zeros((num_songs, num_songs))
@@ -110,51 +165,29 @@ def k_means(data, c_count, max_iter, dist_matrix, tag_matrix):
 
     return cs, mus, cluster_mfcc_dists, cluster_tag_dists
 
+#Clusters a set of songs. Returns the parameters of the clustering.
+def cluster_history(history, tms, weights, num_songs_to_cluster, copies={}):
+    tag_diffs = weights[7] * tag_differences(history[:, 7])
 
+    mfcc_diffs = weights[8] * MFCC_dists(tms, copies, True)
+    pickle.dump(mfcc_diffs, open('distances.pickle', 'wb'))
+    history = np.dot(history[:,0:7],np.diag(weights[0:7]))
+    cs, mus, cluster_mfcc_dists, cluster_tag_dists = k_means(history[0:num_songs_to_cluster], 4, 200, mfcc_diffs, tag_diffs)
+    return cs, mus, cluster_mfcc_dists, cluster_tag_dists
 
-
-# Script
-
-# TUNE THIS
-# Features: Tempo, Familiarity, Hotness, Danceability, Duration, Energy, Loudness, Terms, MFCC
-#weight = [np.array([1,1,1,1,1,1,1,1]),np.array([1,1,1,1/200,1,1/10,1,1]),np.array([0,0,0,0,0,0,0,1]),np.array([1,1,1,1/200,1,1/10,0,1]),np.array([1,1,1,1/200,1,1/10,1,.01]),np.array([0,0,0,1/200,1,1/10,1,1]),np.array([0,0,0,1/200,1,1/10,1,1/100]),np.array([1/10,1/10,1/10,1/200,1,1/10,1,2]),np.array([1,1,1,1,1,1,1,5]),np.array([1,0,1,.01,.4,.3,.3,.1])]
-#more weights = np.array([1, 0.1, 0.3, 1, 0.2, 1, 0.5, 1, 1.2]), 
-
-"""
-[0 0 0 0 0 0]
-[1 1 1 0 1 1]
-[0 0 1 0 0 0]
-[1 1 1 1 0 1]
-[0 0 0 1 0 0]
-[1 1 1 0 1 1]
-[0 0 0 1 1 0]
-[0 0 0 0 1 0]
-[1 1 1 1 0 1]
-[1 1 0 1 1 1]"""
-
-#SONGS
-"""
-("I Didn't Mean To", 'Casual') Rap
-('Soul Deep', 'The Box Tops') Folk
-('Amor De Cabaret', 'Sonora Santanera') Weird slow Spanish
-('Something Girls', 'Adam Ant') Folk/Rock
-('Face the Ashes', 'Gob') Rock/Metal
-('The Moon And I (Ordinary Day Album Version)', 'Jeff And Sheri Easter') Country
-"""
-#weight = [np.array([1,1,1,1,1,1,1,1,1]),np.array([1,1,1,1,1/200,1,1/10,1,.01]),np.array([1,1,1,1,1/200,1,1/10,1,1]),np.array([0,0,0,0,0,0,0,0,1]),np.array([1,1,1,1,1/200,1,1/10,0,1]),np.array([1,0,0,0,1/200,1,1/10,1,1]),np.array([1,0,0,0,1/200,1,1/10,1,1/100]),np.array([1,1/10,1/10,1/10,1/200,1,1/10,1,2]),np.array([1,1,1,1,1,1,1,1,5]),np.array([1,1,0,1,.01,.4,.3,.3,.1])]
-#weight = [np.array([1, 0, 0, 0, 0, 0, 1, 1, 0.1])]
-weight = [np.array([0, 0, 0, 0, 0, 0, 0, 0, 1])]
-for weights in weight:
-
-    data = np.load('TestCase.npy')
+#Loads songs in and formats the data.
+def load_data(name, num_songs_to_cluster):
+    data = np.load(name, encoding='bytes')
+    if num_songs_to_cluster == 0:
+        num_songs_to_cluster = data.shape[0]
+    titles = []
     new_data = []
     for i in data:
         new_data.append(i[2:])
+        titles.append(i[:2])
     new_data = np.array(new_data)
     data = new_data
 
-    num_songs = data.shape[0]
-    num_songs_to_cluster = 14
     tms = [None] * num_songs_to_cluster
     converted = [None] * num_songs_to_cluster
     for i in range(0, num_songs_to_cluster):
@@ -163,14 +196,4 @@ for weights in weight:
         converted[i] = np.concatenate((converted[i], data[i][4:8].astype(np.float64)))
         converted[i] = np.concatenate((converted[i], [set(data[i][3].decode('UTF-8').split('\t'))]))
     converted = np.array(converted)
-
-    tag_diffs = weights[7]*tag_differences(converted[:,7])
-    print("Data processed, tag matrix calculated")
-
-    mfcc_diffs = weights[8]*MFCC_dists(tms)
-    print("MFCC matrix calculated")
-    print(converted[:,0:7])
-    print(mfcc_diffs)
-    converted = np.dot(converted[:,0:7],np.diag(weights[0:7]))
-    cs, mus, cluster_mfcc_dists, cluster_tag_dists = k_means(converted[0:num_songs_to_cluster], 3, 20, mfcc_diffs, tag_diffs)
-    print(cs)
+    return converted, tms, titles
