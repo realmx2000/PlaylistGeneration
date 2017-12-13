@@ -83,14 +83,10 @@ def generate_full_history(histories, histories_tms):
 #First uses centroid distance as a heuristic to restrict the search space, then uses
 #the full FSS calculation.
 def find_nearest(songs, histories, songs_tms, histories_tms, n, weights):
-    #history, tms, copies = generate_full_history(histories, histories_tms)
-    history = histories[0]
-    tms = histories_tms[0]
-    copies = {}
+    history, tms, copies = generate_full_history(histories, histories_tms)
     cs, mus, cluster_mfcc_dists, cluster_tag_dists = ind_cluster.cluster_history(history, tms, weights, len(history), copies)
 
     mfcc_dists = weights[8] * ind_cluster.custom_MFCC_dists(songs_tms, tms, copies, False)
-    #tag_dists = weights[7] * ind_cluster.custom_tag_differences(songs, history)
     cluster_dists = np.zeros(songs.shape[0])
     for song in range(songs.shape[0]):
         cluster_dists[song] = calculate_cluster_dist(songs[song], mus, cs, mfcc_dists[song], weights)
@@ -102,8 +98,7 @@ def find_nearest(songs, histories, songs_tms, histories_tms, n, weights):
     heuristic_tms = []
     for index in arg_approx_smallest:
         heuristic_tms.append(songs_tms[index])
-    mfcc_dists = weights[8] * ind_cluster.custom_MFCC_dists(heuristic_tms, tms, copies, False)#Change back to true
-    #tag_dists = weights[7] * ind_cluster.custom_tag_differences(heuristic_nearest, history)
+    mfcc_dists = weights[8] * ind_cluster.custom_MFCC_dists(heuristic_tms, tms, copies, True)
     cluster_dists = np.zeros(scope)
     for song in range(scope):
         cluster_dists[song] = calculate_cluster_dist(heuristic_nearest[song, :], mus, cs, mfcc_dists[song], weights)
@@ -111,28 +106,3 @@ def find_nearest(songs, histories, songs_tms, histories_tms, n, weights):
     arg_smallest = np.argpartition(cluster_dists, n)[:n]
 
     return arg_approx_smallest[arg_smallest]
-
-def evaluate(playlist, histories):
-    score = 0
-    for history in histories:
-        tag_matrix = ind_cluster.custom_tag_differences(playlist[:,7], history[:,7])
-        score += np.sum(tag_matrix)
-    return score
-
-#Parameters
-n = 8
-weights = [.02, 3, 2.5, 1, 0.01, 2, .14, 0, 1/100000]
-#weights = [.02, 1, 3, 2.5, 0.01, 3, .2, 1, 1/100000]
-#weights = [0.1,0,0,0,0,0,0,1,0]
-num_histories = 1
-indicies = [2]
-
-songs, song_tms, titles = ind_cluster.load_data('songs.npy', 0)
-histories = [None] * num_histories
-histories_tms = [None] * num_histories
-for i in range(num_histories):
-    histories[i], histories_tms[i], _ = ind_cluster.load_data('history' + str(indicies[i]) + '.npy', 0)
-playlist_indicies = find_nearest(songs, histories, song_tms, histories_tms, n, weights)
-
-for index in playlist_indicies:
-    print(titles[index])

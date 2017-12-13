@@ -215,7 +215,7 @@ def likelihood(priors1, priors2, means1, means2, covariances):
 def total_cen_distance(means1, means2):
 	return 2*centroid_distance(means1, means2) - centroid_distance(means1, means1) - centroid_distance(means2, means2)
 
-#Calculates the sum of centroid distances
+#Calculates the normalized sum of centroid distances
 def centroid_distance(means1, means2):
 	dist = 0
 	for i in range(means1.shape[1]):

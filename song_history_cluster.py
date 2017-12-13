@@ -167,10 +167,9 @@ def k_means(data, c_count, max_iter, dist_matrix, tag_matrix):
 
 #Clusters a set of songs. Returns the parameters of the clustering.
 def cluster_history(history, tms, weights, num_songs_to_cluster, copies={}):
-    #TODO: Tag Differences
     tag_diffs = weights[7] * tag_differences(history[:, 7])
 
-    mfcc_diffs = weights[8] * MFCC_dists(tms, copies, False) #TODO: Switch back to true
+    mfcc_diffs = weights[8] * MFCC_dists(tms, copies, True)
     pickle.dump(mfcc_diffs, open('distances.pickle', 'wb'))
     history = np.dot(history[:,0:7],np.diag(weights[0:7]))
     cs, mus, cluster_mfcc_dists, cluster_tag_dists = k_means(history[0:num_songs_to_cluster], 4, 200, mfcc_diffs, tag_diffs)
@@ -198,47 +197,3 @@ def load_data(name, num_songs_to_cluster):
         converted[i] = np.concatenate((converted[i], [set(data[i][3].decode('UTF-8').split('\t'))]))
     converted = np.array(converted)
     return converted, tms, titles
-
-# Script
-
-# TUNE THIS
-# Features: Tempo, Familiarity, Hotness, Danceability, Duration, Energy, Loudness, Terms, MFCC
-#weight = [np.array([1,1,1,1,1,1,1,1]),np.array([1,1,1,1/200,1,1/10,1,1]),np.array([0,0,0,0,0,0,0,1]),np.array([1,1,1,1/200,1,1/10,0,1]),np.array([1,1,1,1/200,1,1/10,1,.01]),np.array([0,0,0,1/200,1,1/10,1,1]),np.array([0,0,0,1/200,1,1/10,1,1/100]),np.array([1/10,1/10,1/10,1/200,1,1/10,1,2]),np.array([1,1,1,1,1,1,1,5]),np.array([1,0,1,.01,.4,.3,.3,.1])]
-#more weights = np.array([1, 0.1, 0.3, 1, 0.2, 1, 0.5, 1, 1.2]), 
-
-"""
-[0 0 0 0 0 0]
-[1 1 1 0 1 1]
-[0 0 1 0 0 0]
-[1 1 1 1 0 1]
-[0 0 0 1 0 0]
-[1 1 1 0 1 1]
-[0 0 0 1 1 0]
-[0 0 0 0 1 0]
-[1 1 1 1 0 1]
-[1 1 0 1 1 1]"""
-
-#SONGS
-"""
-("I Didn't Mean To", 'Casual') Rap
-('Soul Deep', 'The Box Tops') Folk
-('Amor De Cabaret', 'Sonora Santanera') Weird slow Spanish
-('Something Girls', 'Adam Ant') Folk/Rock
-('Face the Ashes', 'Gob') Rock/Metal
-('The Moon And I (Ordinary Day Album Version)', 'Jeff And Sheri Easter') Country
-"""
-#weight = [np.array([1,1,1,1,1,1,1,1,1]),np.array([1,1,1,1,1/200,1,1/10,1,.01]),np.array([1,1,1,1,1/200,1,1/10,1,1]),np.array([0,0,0,0,0,0,0,0,1]),np.array([1,1,1,1,1/200,1,1/10,0,1]),np.array([1,0,0,0,1/200,1,1/10,1,1]),np.array([1,0,0,0,1/200,1,1/10,1,1/100]),np.array([1,1/10,1/10,1/10,1/200,1,1/10,1,2]),np.array([1,1,1,1,1,1,1,1,5]),np.array([1,1,0,1,.01,.4,.3,.3,.1])]
-#weight = [np.array([1, 0, 0, 0, 0, 0, 1, 1, 0.1])]
-
-'''
-weight = np.array([.02,3,2.5,1,0.01,2,.14,0,0])
-num_songs_to_cluster=20
-converted, tms, _ = load_data('history0.npy', num_songs_to_cluster)
-converted1, tms1, _ = load_data('history3.npy', num_songs_to_cluster)
-
-cs, mus, cluster_mfcc_dists, cluster_tag_dists = cluster_history(converted, tms, weight, num_songs_to_cluster)
-cs1, mus1, cluster_mfcc_dists1, cluster_tag_dists1 = cluster_history(converted1, tms1, weight, num_songs_to_cluster)
-print(tm_cl.centroid_distance(mus, mus1))
-print(tm_cl.centroid_distance(mus, mus))
-print(tm_cl.centroid_distance(mus1, mus1))
-'''
