@@ -5,12 +5,17 @@ import scipy.special as sp
 import sys
 import math
 
+# Reconstructs the timbre matrix from a flattened vectors, which is 
+# how the data is read in
 def reconstruct(tm_flat):
 	return(np.reshape(tm_flat, (-1, int(tm_flat.shape[0]/12))))
 
+# Collapsing k-means along with a condition to make sure every cluster
+# has size of at least 2, which is what is required to fit a diagonal
+# covariance matrix.
 def cluster_song(tm, threshold = 1000, min_clusters = 4, max_it = 100):
 	kmeans = None
-	k = 30
+	k = 15
 	first = True
 
 	converged = False
@@ -25,6 +30,7 @@ def cluster_song(tm, threshold = 1000, min_clusters = 4, max_it = 100):
 			continue; 
 
 		kmeans = KMeans(n_clusters=k, init=centroids, max_iter=1).fit(tm)
+		# Collapse centroids that are too close together
 		new_centroids = collapse_centroids(kmeans)
 		new_distortion = 0
 		for i in range(kmeans.labels_.shape[0]):
@@ -32,6 +38,7 @@ def cluster_song(tm, threshold = 1000, min_clusters = 4, max_it = 100):
 			error = tm[i,:] - centroid_assignment
 			new_distortion += np.dot(error.T, error)
 
+		# Check for convergence if we haven't merged two clusters on this iteration
 		if (new_centroids.shape == centroids.shape and np.linalg.norm(new_distortion - distortion) < threshold):
 			centroids = new_centroids
 			converged = True
@@ -49,6 +56,7 @@ def cluster_song(tm, threshold = 1000, min_clusters = 4, max_it = 100):
 		kmeans = KMeans(n_clusters=k, init=centroids).fit(tm)
 		centroids = kmeans.cluster_centers_
 
+	# Find clusters of size 1
 	not_usable = set()
 	usable = set()
 	keep = []
@@ -67,6 +75,7 @@ def cluster_song(tm, threshold = 1000, min_clusters = 4, max_it = 100):
 			usable.add(count)
 			new_centroids.append(centroids[count])
 
+	# Keep clusters that have size 2 or greater
 	for i in range(len(labels)):
 		if labels[i] in usable:
 			keep.append(i)
@@ -77,17 +86,12 @@ def cluster_song(tm, threshold = 1000, min_clusters = 4, max_it = 100):
 			labels[i] -= ind
 	keep = np.array(keep)
 
+	# Drop vectors belonging to size 1 clusters
 	return np.array(new_centroids), np.array(labels)[keep], tm[keep,:]
 
-def assign(original_index, usable, centroids):
-	position = centroids[original_index]
-	index = -1
-	min_distance = float('inf')
-	for i in usable:
-		if np.linalg.norm(centroids[i]-position) < min_distance:
-			index = i
-	return index
 
+# Concatenate window_length MFCC vectors together along with deltas
+# to make cloud vectors
 def generate_cloud(timbre_matrix, window_length):
 	length = timbre_matrix.shape[1]
 	vectors = np.zeros((length - window_length, (window_length+1) * 12))
@@ -97,26 +101,9 @@ def generate_cloud(timbre_matrix, window_length):
 		vectors[index,:] = np.concatenate((vector,deltas))
 	return(vectors)
 
-def remove_one_clusters(kmeans):
-	centroids = kmeans.cluster_centers_
-	labels = kmeans.labels_
-	counts = {}
-	new_centroids = []
-	shape = centroids.shape[0]
-
-	for i in labels:
-		if i not in counts:
-			counts[i] = 0
-		counts[i] += 1
-
-	for i in range(shape):
-		if counts[i] > 1:
-			new_centroids.append(centroids[i])
-
-	return(new_centroids)
-
+# Check centroids and collapse together if any are closer than threshold
+# Threshold was tuned by inspecting output cluster numbers
 def collapse_centroids(kmeans):
-	# TUNE THIS
 	threshold = 200
 
 	centroids = kmeans.cluster_centers_
@@ -127,6 +114,7 @@ def collapse_centroids(kmeans):
 			counts[i] = 0
 		counts[i] += 1
 
+	# Create matrix of distances between centroids
 	shape = centroids.shape[0]
 	distances = np.zeros((shape,shape))
 	for i in range(shape):
@@ -135,7 +123,8 @@ def collapse_centroids(kmeans):
 			distances[i][j] = np.linalg.norm(centroids[j]-centroids[i])
 			distances[j][i] = distances[i][j]
 
-
+	# Loop through and collapse if any two are too close. Multiple
+	# collapses of the same cluster are disallowed
 	new_centroids = []
 	already_combined = set()
 	for i in range(shape):
